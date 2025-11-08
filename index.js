@@ -17,6 +17,30 @@ const csvWriter = createObjectCsvWriter({
     ],
 });
 
+const MAX_RETRIES = 3;
+const TIMEOUT = 30000;
+
+
+async function navigateWithRetry(page, url, retries = MAX_RETRIES) {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            await page.goto(url, {
+                waitUntil: "domcontentloaded",
+                timeout: TIMEOUT
+            });
+            return true;
+        } catch (err) {
+            console.log(`Attempt ${attempt} failed for URL: ${url}`);
+            if (attempt === retries) {
+                console.log(`URL ignored after ${retries} attempts: ${url}`);
+                return false;
+            }
+            await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+    }
+    return false;
+}
+
 
 async function scrapeAmazon() {
     const browser = await puppeteer.launch({ headless: true }); // Set headless to false to see the browser actions
@@ -24,11 +48,15 @@ async function scrapeAmazon() {
 
     const results = [];
 
-    const MAX_PAGES = 2;
+    const MAX_PAGES = 5;
 
     for (let currentPage = 1; currentPage <= MAX_PAGES; currentPage++) {
         const pageUrl = `${BASE_URL}${currentPage}`;
-        await page.goto(pageUrl, { waitUntil: "networkidle2" });
+        const listPageLoaded = await navigateWithRetry(page, pageUrl);
+        if (!listPageLoaded) {
+            console.log(`Failed to load list page ${currentPage}, moving to the next page`);
+            continue;
+        }
         console.log(`Scraping page ${currentPage}: ${pageUrl}`);
 
         const productLinks = await page.$$eval(
