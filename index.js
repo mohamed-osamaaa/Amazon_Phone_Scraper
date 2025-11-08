@@ -1,7 +1,7 @@
 import { createObjectCsvWriter } from 'csv-writer';
 import puppeteer from 'puppeteer';
 
-const BASE_URL = "https://www.amazon.eg/-/en/s?i=electronics&rh=n%3A21832883031&s=popularity-rank&fs=true&language=en&qid=1762578514&xpid=b4uF2OEAeCBT_&ref=sr_pg_1";
+const BASE_URL = "https://www.amazon.eg/-/en/s?i=electronics&rh=n%3A21832883031&s=popularity-rank&fs=true&language=en&qid=1762578514&xpid=b4uF2OEAeCBT_&ref=sr_pg_";
 
 const csvWriter = createObjectCsvWriter({
     path: "phones.csv",
@@ -21,14 +21,16 @@ const csvWriter = createObjectCsvWriter({
 async function scrapeAmazon() {
     const browser = await puppeteer.launch({ headless: true }); // Set headless to false to see the browser actions
     const page = await browser.newPage();
-    await page.goto(BASE_URL, { waitUntil: "networkidle2" });
 
     const results = [];
 
-    let hasNextPage = true;
+    const MAX_PAGES = 2;
 
-    while (hasNextPage) {
-        console.log("Scraping new page...");
+    for (let currentPage = 1; currentPage <= MAX_PAGES; currentPage++) {
+        const pageUrl = `${BASE_URL}${currentPage}`;
+        await page.goto(pageUrl, { waitUntil: "networkidle2" });
+        console.log(`Scraping page ${currentPage}: ${pageUrl}`);
+
         const productLinks = await page.$$eval(
             "div.a-section.a-spacing-base a.a-link-normal.s-no-outline",
             (links) => links.map((a) => a.href).filter((href) => href.includes("/dp/"))
@@ -109,21 +111,6 @@ async function scrapeAmazon() {
             } catch (err) {
                 console.log(`Error scraping product: ${url}`);
             }
-            // To Scrap one product for testing
-            hasNextPage = false;
-            break;
-
-            // await page.goto(BASE_URL, { waitUntil: "networkidle2" });
-
-            // const nextButton = await page.$("a.s-pagination-item.s-pagination-next:not([aria-disabled])");
-            // if (nextButton) {
-            //     await Promise.all([
-            //         page.click("a.s-pagination-item.s-pagination-next"),
-            //         page.waitForNavigation({ waitUntil: "networkidle2" }),
-            //     ]);
-            // } else {
-            //     hasNextPage = false;
-            // }
         }
     }
     await csvWriter.writeRecords(results);
